@@ -1,4 +1,3 @@
-#%%
 import torch_geometric
 import torch
 import numpy as np
@@ -9,7 +8,6 @@ from torch_geometric.loader import DataLoader
 import os
 from tqdm import tqdm
 
-# %%
 class MoleculeDataset(Dataset):
     def __init__(self, root, filename, test=False, transform=None, pre_transform=None):
         self.test = test
@@ -140,10 +138,3 @@ def load_dataset(batch_size, filename, root='data/'):
     test_loader = DataLoader(test_dataset, batch_size=batch_size)
     
     return train_loader, val_loader, test_loader
-# %%
-tr, val, test = load_dataset(32, 'delaney-processed.csv')
-tr
-# %%
-for i in val:
-    print(i.edge_index.dtype)
-# %%
