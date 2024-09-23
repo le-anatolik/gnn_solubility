@@ -5,6 +5,7 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Draw
 from torch_geometric.data import Dataset, Data
+from torch_geometric.loader import DataLoader
 import os
 from tqdm import tqdm
 
@@ -79,10 +80,7 @@ class MoleculeDataset(Dataset):
         return torch.tensor(all_node_feats, dtype=torch.float)
 
     def _get_edge_features(self, mol):
-        """ 
-        This will return a matrix / 2d array of the shape
-        [Number of edges, Edge Feature size]
-        """
+        
         all_edge_feats = []
 
         for bond in mol.GetBonds():
@@ -91,11 +89,10 @@ class MoleculeDataset(Dataset):
             edge_feats.append(bond.GetBondTypeAsDouble())
             # Feature 2: Rings
             edge_feats.append(bond.IsInRing())
-            # Feature 3: Arom
+            # Feature 3: Aromatic
             edge_feats.append(bond.GetIsAromatic())
-            # Append node features to matrix (twice, per direction)
+            # Append edge features to matrix (twice, per direction)
             all_edge_feats += [edge_feats, edge_feats]
-            # all_edge_feats += [edge_feats]
 
         all_edge_feats = np.asarray(all_edge_feats)
         return torch.tensor(all_edge_feats, dtype=torch.float)
@@ -105,20 +102,17 @@ class MoleculeDataset(Dataset):
         for bond in mol.GetBonds():
             i = bond.GetBeginAtomIdx()
             j = bond.GetEndAtomIdx()
-            edge_indices += [[i, j], [j, i]]
-            # edge_indices += [[i, j]]
+            edge_indices += [[i, j], [j, i]] #twice
 
         edge_indices = torch.tensor(edge_indices)
-        # edge_indices = edge_indices.t().to(torch.long).view(2, -1)
         edge_indices = edge_indices.t()
-        return edge_indices
+        return torch.tensor(edge_indices, dtype=torch.int)
 
     def _get_labels(self, label):
-        # label = np.asarray([label])
         return torch.tensor(label, dtype=torch.float32)
 
     def len(self):
-        return len(self.data)
+        return len(self.data)-1
 
     def get(self, idx):
         if self.test:
@@ -128,5 +122,28 @@ class MoleculeDataset(Dataset):
             data = torch.load(os.path.join(self.processed_dir, 
                                  f'data_{idx}.pt'))   
         return data
+
+def load_dataset(batch_size, filename, root='data/'):
+    
+    dataset = MoleculeDataset(root=root, filename=filename)
+    print(len(dataset))
+    
+    train_size = int(0.8 * len(dataset))
+    val_size = int(0.1 * len(dataset))
+    test_size = len(dataset) - train_size - val_size
+    
+    train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
+        dataset, [train_size, val_size, test_size])
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size)
+    
+    return train_loader, val_loader, test_loader
 # %%
+tr, val, test = load_dataset(32, 'delaney-processed.csv')
+tr
+# %%
+for i in val:
+    print(i.edge_index.dtype)
 # %%
